@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/bun-sql";
-import * as schema from "./schema";
+import * as schema from "../../database/schema";
 import { SQL } from "bun";
 
 const client = new SQL(

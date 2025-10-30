@@ -1,9 +1,9 @@
 import { db } from "../db/db";
 import {
-  depositTable as deposits,
-  withdrawalTable as withdrawals,
+  depositTable,
+  withdrawalTable,
   transactionLogTable,
-} from "../../database/schema/finance";
+} from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { WalletService } from "./walletService";
@@ -58,9 +58,10 @@ export class TransactionService {
 
     await db.transaction(async (tx) => {
       // Create deposit record
-      await tx.insert(deposits).values({
+      await tx.insert(depositTable).values({
         id: depositId,
         userId: validatedInput.userId,
+        operatorId: validatedInput.operatorId,
         amount: validatedInput.amount,
         paymentMethod: validatedInput.paymentMethod,
         referenceId: validatedInput.referenceId,
@@ -68,11 +69,6 @@ export class TransactionService {
         bonusAmount: 0, // Will be calculated on completion
       });
 
-      // Get balances before
-      const balances = await WalletService.getWalletBalances({
-        userId: validatedInput.userId,
-        operatorId: validatedInput.operatorId,
-      });
       // Create transaction log
       await tx.insert(transactionLogTable).values({
         userId: validatedInput.userId,
@@ -80,10 +76,10 @@ export class TransactionService {
         type: "DEPOSIT",
         status: "PENDING",
         wagerAmount: validatedInput.amount,
-        realBalanceBefore: balances?.realBalance ?? 0,
-        realBalanceAfter: balances?.realBalance ?? 0,
-        bonusBalanceBefore: balances?.bonusBalance ?? 0,
-        bonusBalanceAfter: balances?.bonusBalance ?? 0,
+        realBalanceBefore: 0, // Placeholder, will be updated
+        realBalanceAfter: 0,
+        bonusBalanceBefore: 0,
+        bonusBalanceAfter: 0,
         metadata: { depositId, paymentMethod: validatedInput.paymentMethod },
       });
     });
@@ -101,39 +97,21 @@ export class TransactionService {
       // Find pending deposit
       const [deposit] = await tx
         .select()
-        .from(deposits)
+        .from(depositTable)
         .where(
           and(
-            eq(deposits.referenceId, validatedInput.transactionId),
-            eq(deposits.status, "PENDING")
+            eq(depositTable.referenceId, validatedInput.transactionId),
+            eq(depositTable.status, "PENDING")
           )
         )
         .limit(1);
 
       if (!deposit) throw new Error("Deposit not found or already processed");
 
-      // Find the original transaction log to get the operatorId
-      const [txLog] = await tx
-        .select()
-        .from(transactionLogTable)
-        .where(
-          and(
-            eq(transactionLogTable.userId, deposit.userId),
-            eq(transactionLogTable.type, "DEPOSIT"),
-            eq(transactionLogTable.status, "PENDING")
-          )
-        )
-        .limit(1);
-
-      if (!txLog || !txLog.operatorId)
-        throw new Error("Transaction log not found or operatorId is missing");
-
-      const operatorId = txLog.operatorId;
-
       // Get balances before
       const balances = await WalletService.getWalletBalances({
         userId: deposit.userId,
-        operatorId: operatorId,
+        operatorId: deposit.operatorId,
       });
 
       if (!balances) throw new Error("Wallet not found");
@@ -141,7 +119,7 @@ export class TransactionService {
       // Credit wallet
       const newBalances = await WalletService.creditToWallet({
         userId: deposit.userId,
-        operatorId: operatorId,
+        operatorId: deposit.operatorId,
         amount: deposit.amount,
         isReal: true,
       });
@@ -152,7 +130,7 @@ export class TransactionService {
       if (freeSpinsAwarded > 0) {
         finalBalances = await WalletService.creditToWallet({
           userId: deposit.userId,
-          operatorId: operatorId,
+          operatorId: deposit.operatorId,
           amount: freeSpinsAwarded,
           isReal: false, // Free spins to bonus balance
         });
@@ -168,33 +146,40 @@ export class TransactionService {
       if (xpResult.levelUp) {
         await VIPRewardService.applyLevelUpRewards({
           userId: deposit.userId,
-          operatorId: operatorId,
+          operatorId: deposit.operatorId,
           newLevel: xpResult.levelUp.newLevel,
         });
       }
 
       // Update deposit status and bonus amount
       await tx
-        .update(deposits)
+        .update(depositTable)
         .set({
           status: "COMPLETED",
-          bonusAmount: freeSpinsAwarded,
+          bonusAmount: xpResult.newXP,
           updatedAt: new Date(),
         })
-        .where(eq(deposits.id, deposit.id));
+        .where(eq(depositTable.id, deposit.id));
 
       // Update transaction log
       await tx
         .update(transactionLogTable)
         .set({
           status: "COMPLETED",
-          realBalanceAfter: finalBalances.realBalance,
-          bonusBalanceAfter: finalBalances.bonusBalance,
+          realBalanceAfter: newBalances.realBalance,
+          bonusBalanceAfter: newBalances.bonusBalance,
           vipPointsAdded: xpResult.newXP,
           updatedAt: new Date(),
           metadata: { completed: true, externalId: validatedInput.externalId },
         })
-        .where(eq(transactionLogTable.id, txLog.id));
+        .where(
+          and(
+            eq(transactionLogTable.userId, deposit.userId),
+            eq(transactionLogTable.operatorId, deposit.operatorId),
+            eq(transactionLogTable.type, "DEPOSIT"),
+            eq(transactionLogTable.status, "PENDING")
+          )
+        );
 
       // Send real-time notification for deposit completion
       WebSocketService.broadcastToUser(deposit.userId, {
@@ -213,7 +198,7 @@ export class TransactionService {
       // Send real-time notification to admin for new transaction
       WebSocketService.broadcastToAllAdmins({
         type: "new_transaction",
-        operatorId: operatorId,
+        operatorId: deposit.operatorId,
         data: {
           transactionType: "deposit",
           userId: deposit.userId,
@@ -240,13 +225,8 @@ export class TransactionService {
     const withdrawalId = crypto.randomUUID();
 
     await db.transaction(async (tx) => {
-      const balancesBefore = await WalletService.getWalletBalances({
-        userId: validatedInput.userId,
-        operatorId: validatedInput.operatorId,
-      });
-
       // Debit wallet
-      const balancesAfter = await WalletService.debitFromWallet({
+      await WalletService.debitFromWallet({
         userId: validatedInput.userId,
         operatorId: validatedInput.operatorId,
         amount: validatedInput.amount,
@@ -254,25 +234,30 @@ export class TransactionService {
       });
 
       // Create withdrawal record
-      await tx.insert(withdrawals).values({
-        id: withdrawalId,
+      await tx.insert(withdrawalTable).values({
         userId: validatedInput.userId,
+        operatorId: validatedInput.operatorId,
         amount: validatedInput.amount,
         payoutMethod: validatedInput.payoutMethod,
         status: "PENDING",
       });
 
       // Create transaction log
+      const balances = await WalletService.getWalletBalances({
+        userId: validatedInput.userId,
+        operatorId: validatedInput.operatorId,
+      });
+
       await tx.insert(transactionLogTable).values({
         userId: validatedInput.userId,
         operatorId: validatedInput.operatorId,
         type: "WITHDRAWAL",
         status: "PENDING",
         wagerAmount: validatedInput.amount,
-        realBalanceBefore: balancesBefore?.realBalance || 0,
-        realBalanceAfter: balancesAfter.realBalance,
-        bonusBalanceBefore: balancesBefore?.bonusBalance || 0,
-        bonusBalanceAfter: balancesAfter.bonusBalance,
+        realBalanceBefore: balances?.realBalance || 0,
+        realBalanceAfter: (balances?.realBalance || 0) - validatedInput.amount,
+        bonusBalanceBefore: balances?.bonusBalance || 0,
+        bonusBalanceAfter: balances?.bonusBalance || 0,
         metadata: { withdrawalId },
       });
     });
@@ -289,11 +274,11 @@ export class TransactionService {
     await db.transaction(async (tx) => {
       const [withdrawal] = await tx
         .select()
-        .from(withdrawals)
+        .from(withdrawalTable)
         .where(
           and(
-            eq(withdrawals.id, validatedInput.withdrawalId),
-            eq(withdrawals.status, "PENDING")
+            eq(withdrawalTable.id, validatedInput.withdrawalId),
+            eq(withdrawalTable.status, "PENDING")
           )
         )
         .limit(1);
@@ -306,37 +291,20 @@ export class TransactionService {
 
       // Update withdrawal
       await tx
-        .update(withdrawals)
+        .update(withdrawalTable)
         .set({
           status: newStatus,
           updatedBy: validatedInput.adminId,
           note: validatedInput.note,
           updatedAt: new Date(),
         })
-        .where(eq(withdrawals.id, validatedInput.withdrawalId));
-
-      const [txLog] = await tx
-        .select()
-        .from(transactionLogTable)
-        .where(
-          and(
-            eq(transactionLogTable.userId, withdrawal.userId),
-            eq(transactionLogTable.type, "WITHDRAWAL"),
-            eq(transactionLogTable.status, "PENDING")
-          )
-        )
-        .limit(1);
-
-      if (!txLog || !txLog.operatorId)
-        throw new Error("Transaction log not found or operatorId is missing");
-
-      const operatorId = txLog.operatorId;
+        .where(eq(withdrawalTable.id, validatedInput.withdrawalId));
 
       // If rejected, return funds
       if (validatedInput.action === "reject") {
         await WalletService.creditToWallet({
           userId: withdrawal.userId,
-          operatorId: operatorId,
+          operatorId: withdrawal.operatorId,
           amount: withdrawal.amount,
           isReal: true,
         });
@@ -351,7 +319,14 @@ export class TransactionService {
           updatedAt: new Date(),
           metadata: { processed: true, note: validatedInput.note },
         })
-        .where(eq(transactionLogTable.id, txLog.id));
+        .where(
+          and(
+            eq(transactionLogTable.userId, withdrawal.userId),
+            eq(transactionLogTable.operatorId, withdrawal.operatorId),
+            eq(transactionLogTable.type, "WITHDRAWAL"),
+            eq(transactionLogTable.status, "PENDING")
+          )
+        );
 
       // Send real-time notification to user for withdrawal update
       WebSocketService.broadcastToUser(withdrawal.userId, {
@@ -370,7 +345,7 @@ export class TransactionService {
       // Send real-time notification to admin for transaction update
       WebSocketService.broadcastToAllAdmins({
         type: "new_transaction",
-        operatorId: operatorId,
+        operatorId: withdrawal.operatorId,
         data: {
           transactionType: "withdrawal",
           userId: withdrawal.userId,

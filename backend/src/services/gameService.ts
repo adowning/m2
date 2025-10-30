@@ -12,7 +12,7 @@ const CreateGameInputSchema = z.object({
   jackpotGroup: z.string().nullable(),
   minBet: z.number().min(0),
   maxBet: z.number().min(0),
-  paytable: z.array(z.record(z.string(), z.number())),
+  paytable: z.array(z.record(z.number())),
 });
 
 const UpdateGameInputSchema = CreateGameInputSchema.partial();
