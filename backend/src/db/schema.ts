@@ -108,7 +108,7 @@ export const games = pgTable(
     jackpotGroup: text("jackpot_group"), // nullable for games not in jackpot
     minBet: numeric("min_bet", { precision: 10, scale: 2 }).notNull(),
     maxBet: numeric("max_bet", { precision: 10, scale: 2 }).notNull(),
-    paytable: jsonb("paytable"), // complex data like payouts
+    paytable: jsonb("paytable").$type<Record<string, number>[]>(), // complex data like payouts
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -471,9 +471,17 @@ export const jackpotsRelations = relations(jackpots, ({ one }) => ({
   }),
 }));
 
-export const GameSelectSchema = createSelectSchema(games);
-export const GameInsertSchema = createInsertSchema(games);
-export const GameUpdateSchema = createUpdateSchema(games);
+import { z } from "zod";
+
+export const GameSelectSchema = createSelectSchema(games, {
+  paytable: z.array(z.record(z.string(), z.number())),
+});
+export const GameInsertSchema = createInsertSchema(games, {
+  paytable: z.array(z.record(z.string(), z.number())),
+});
+export const GameUpdateSchema = createUpdateSchema(games, {
+  paytable: z.array(z.record(z.string(), z.number())),
+});
 export type Game = z.infer<typeof GameSelectSchema>;
 
 export const GameCategorySelectSchema = createSelectSchema(gameCategories);
