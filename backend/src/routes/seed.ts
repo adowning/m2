@@ -3,8 +3,9 @@ import { z } from "zod";
 import { SeedingService } from "../services/seedingService";
 import { BotService } from "../services/botService";
 import { BotSimulationService } from "../services/botSimulationService";
+import type { AppBindings } from "../types";
 
-const app = new Hono();
+const app = new Hono<{ Variables: AppBindings }>();
 
 // Zod schemas for request validation
 const SeedDatabaseSchema = z.object({
@@ -34,7 +35,7 @@ app.post("/database", async (c) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return c.json({ error: "Validation error", details: error.errors }, 400);
+      return c.json({ error: "Validation error", details: error }, 400);
     }
     console.error("Database seeding error:", error);
     return c.json({ error: "Internal server error" }, 500);
@@ -52,7 +53,7 @@ app.post("/bots", async (c) => {
     return c.json({
       success: true,
       message: `Created ${createdBots.length} bot users`,
-      bots: createdBots.map(bot => ({
+      bots: createdBots.map((bot) => ({
         id: bot.id,
         username: bot.username,
         email: bot.email,
@@ -60,7 +61,7 @@ app.post("/bots", async (c) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return c.json({ error: "Validation error", details: error.errors }, 400);
+      return c.json({ error: "Validation error", details: error }, 400);
     }
     console.error("Bot creation error:", error);
     return c.json({ error: "Internal server error" }, 500);
@@ -74,7 +75,10 @@ app.post("/simulate", async (c) => {
     const validatedData = SimulateBotsSchema.parse(body);
 
     // Start simulation in background
-    BotSimulationService.startSimulation(validatedData.duration, validatedData.intensity);
+    BotSimulationService.startSimulation(
+      validatedData.duration,
+      validatedData.intensity
+    );
 
     return c.json({
       success: true,
@@ -83,7 +87,7 @@ app.post("/simulate", async (c) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return c.json({ error: "Validation error", details: error.errors }, 400);
+      return c.json({ error: "Validation error", details: error }, 400);
     }
     console.error("Bot simulation error:", error);
     return c.json({ error: "Internal server error" }, 500);
@@ -120,10 +124,13 @@ app.post("/stop", async (c) => {
         message: "Bot simulation stopped successfully",
       });
     } else {
-      return c.json({
-        success: false,
-        message: "No active simulation to stop",
-      }, 400);
+      return c.json(
+        {
+          success: false,
+          message: "No active simulation to stop",
+        },
+        400
+      );
     }
   } catch (error) {
     console.error("Stop simulation error:", error);

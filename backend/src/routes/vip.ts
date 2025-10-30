@@ -61,7 +61,7 @@ app.post("/vip/add-xp", async (c) => {
     return c.json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return c.json({ error: "Validation error", details: error.errors }, 400);
+      return c.json({ error: "Validation error", details: error }, 400);
     }
     console.error("XP addition error:", error);
     return c.json({ error: "Internal server error" }, 500);

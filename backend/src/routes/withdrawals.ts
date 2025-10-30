@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { auth } from "../config/auth";
 import { TransactionService } from "../services/transactionService";
 import { z } from "zod";
+import type { AppBindings } from "../types";
 
-const app = new Hono();
+const app = new Hono<{ Variables: AppBindings }>();
 
 // Zod schemas
 const WithdrawalRequestSchema = z.object({
@@ -13,7 +14,9 @@ const WithdrawalRequestSchema = z.object({
 });
 
 const AdminActionSchema = z.object({
-  action: z.enum(["approve", "reject"], { errorMap: () => ({ message: "Action must be approve or reject" }) }),
+  action: z.enum(["approve", "reject"], {
+    errorMap: () => ({ message: "Action must be approve or reject" }),
+  }),
   note: z.string().optional(),
 });
 
@@ -48,7 +51,7 @@ app.post("/withdrawals", async (c) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return c.json({ error: "Validation error", details: error.errors }, 400);
+      return c.json({ error: "Validation error", details: error }, 400);
     }
     console.error("Withdrawal request error:", error);
     return c.json({ error: "Internal server error" }, 500);
@@ -86,7 +89,8 @@ app.put("/admin/withdrawals/:id", async (c) => {
       adminId: session.user.id,
     });
 
-    const status = validatedData.action === "approve" ? "COMPLETED" : "REJECTED";
+    const status =
+      validatedData.action === "approve" ? "COMPLETED" : "REJECTED";
 
     return c.json({
       withdrawalId,
@@ -95,7 +99,7 @@ app.put("/admin/withdrawals/:id", async (c) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return c.json({ error: "Validation error", details: error.errors }, 400);
+      return c.json({ error: "Validation error", details: error }, 400);
     }
     console.error("Admin withdrawal processing error:", error);
     return c.json({ error: "Internal server error" }, 500);

@@ -1,10 +1,11 @@
-import { Hono } from 'hono';
-import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
-import { BetService } from '../services/betService';
-import { authMiddleware } from '../middleware/auth';
+import { Hono } from "hono";
+import { z } from "zod";
+import { zValidator } from "@hono/zod-validator";
+import { BetService } from "../services/betService";
+import { authMiddleware } from "../middleware/auth";
+import type { AppBindings } from "../types";
 
-const app = new Hono();
+const app = new Hono<{ Variables: AppBindings }>();
 
 // POST /bets - Place a bet
 const PlaceBetRequestSchema = z.object({
@@ -13,17 +14,17 @@ const PlaceBetRequestSchema = z.object({
 });
 
 app.post(
-  '/bets',
+  "/bets",
   authMiddleware,
-  zValidator('json', PlaceBetRequestSchema),
+  zValidator("json", PlaceBetRequestSchema),
   async (c) => {
     try {
-      const user = c.get('user'); // From auth middleware
-      const body = c.req.valid('json');
+      const user = c.get("user"); // From auth middleware
+      const body = c.req.valid("json");
 
       // Get operator ID from session or user context
       // For now, assume it's passed or default - in real implementation, get from session
-      const operatorId = c.req.header('X-Operator-ID') || 'default-operator-id';
+      const operatorId = c.req.header("X-Operator-ID") || "default-operator-id";
 
       const result = await BetService.placeBet({
         userId: user.id,
@@ -44,9 +45,10 @@ app.post(
         },
       });
     } catch (error) {
-      console.error('Bet placement error:', error);
+      console.error("Bet placement error:", error);
 
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
 
       return c.json(
         {

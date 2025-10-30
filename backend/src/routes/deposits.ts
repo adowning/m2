@@ -3,8 +3,9 @@ import { auth } from "../config/auth";
 import { TransactionService } from "../services/transactionService";
 import { WebhookService } from "../services/webhookService";
 import { z } from "zod";
+import type { AppBindings } from "../types";
 
-const app = new Hono();
+const app = new Hono<{ Variables: AppBindings }>();
 
 // Zod schemas
 const DepositInitiateSchema = z.object({
@@ -48,7 +49,11 @@ app.post("/deposits", async (c) => {
     });
 
     // Return deposit instructions based on payment method
-    const instructions = getPaymentInstructions(validatedData.paymentMethod, referenceId, validatedData.amount);
+    const instructions = getPaymentInstructions(
+      validatedData.paymentMethod,
+      referenceId,
+      validatedData.amount
+    );
 
     return c.json({
       depositId: result.depositId,
@@ -72,7 +77,8 @@ app.post("/webhooks/:provider", async (c) => {
 
     // Get raw body and signature
     const rawBody = await c.req.text();
-    const signature = c.req.header("X-Signature") || c.req.header("X-CashApp-Signature") || "";
+    const signature =
+      c.req.header("X-Signature") || c.req.header("X-CashApp-Signature") || "";
 
     // Validate webhook signature
     const secret = WebhookService.getWebhookSecret(provider);
@@ -89,7 +95,10 @@ app.post("/webhooks/:provider", async (c) => {
 
     // Parse webhook data
     const webhookData = WebhookService.parseCashAppWebhook(rawBody);
-    const transactionData = WebhookService.extractTransactionData(provider, webhookData);
+    const transactionData = WebhookService.extractTransactionData(
+      provider,
+      webhookData
+    );
 
     if (!transactionData.isSuccess) {
       return c.json({ status: "ignored" }, 200); // Ignore non-success webhooks
@@ -111,7 +120,11 @@ app.post("/webhooks/:provider", async (c) => {
 });
 
 // Helper function to get payment instructions
-function getPaymentInstructions(paymentMethod: string, referenceId: string, amount: number): object {
+function getPaymentInstructions(
+  paymentMethod: string,
+  referenceId: string,
+  amount: number
+): object {
   switch (paymentMethod) {
     case "cashapp":
       return {
@@ -119,28 +132,32 @@ function getPaymentInstructions(paymentMethod: string, referenceId: string, amou
         tag: "$cashflowgaming", // Configurable
         amount: amount,
         note: `Deposit ${referenceId}`,
-        instructions: "Send the exact amount to the CashApp tag above with the deposit reference in the note.",
+        instructions:
+          "Send the exact amount to the CashApp tag above with the deposit reference in the note.",
       };
     case "in_store_cash":
       return {
         method: "in_store_cash",
         amount: amount,
         barcode: referenceId, // Could be used to generate barcode
-        instructions: "Visit participating store, show this reference ID and pay the exact amount in cash.",
+        instructions:
+          "Visit participating store, show this reference ID and pay the exact amount in cash.",
       };
     case "in_store_card":
       return {
         method: "in_store_card",
         amount: amount,
         barcode: referenceId,
-        instructions: "Visit participating store, show this reference ID and pay using card.",
+        instructions:
+          "Visit participating store, show this reference ID and pay using card.",
       };
     default:
       return {
         method: paymentMethod,
         amount: amount,
         referenceId: referenceId,
-        instructions: "Please follow the specific instructions for this payment method.",
+        instructions:
+          "Please follow the specific instructions for this payment method.",
       };
   }
 }

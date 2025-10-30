@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { auth } from "../config/auth";
-import { db } from "../db/schema";
+import { db } from "../db/db";
 import { wallets, operators } from "../db/schema";
-import { eq, and } from "drizzle-orm";
-import { CreateUserSchema, LoginUserSchema } from "../db/validation";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
+import type { AppBindings } from "../types";
 
-const app = new Hono();
+const app = new Hono<{ Variables: AppBindings }>();
 
 const RegisterSchema = z.object({
   email: z.string().email(),
@@ -42,7 +42,11 @@ app.post("/register", async (c) => {
     // If operatorId provided, create wallet for the user with that operator
     if (validatedData.operatorId) {
       // Check if operator exists
-      const operator = await db.select().from(operators).where(eq(operators.id, validatedData.operatorId)).limit(1);
+      const operator = await db
+        .select()
+        .from(operators)
+        .where(eq(operators.id, validatedData.operatorId))
+        .limit(1);
       if (operator.length === 0) {
         return c.json({ error: "Invalid operator ID" }, 400);
       }

@@ -2,9 +2,14 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { adminOnly, userOnly } from "../middleware/auth";
-import { GameService, type CreateGameInput, type UpdateGameInput } from "../services/gameService";
+import {
+  GameService,
+  type CreateGameInput,
+  type UpdateGameInput,
+} from "../services/gameService";
+import type { AppBindings } from "../types";
 
-const app = new Hono();
+const app = new Hono<{ Variables: AppBindings }>();
 
 // Zod schemas for validation
 const CreateGameSchema = z.object({
@@ -46,7 +51,7 @@ app.post(
       return c.json({ game }, 201);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return c.json({ error: "Validation error", details: error.errors }, 400);
+        return c.json({ error: "Validation error", details: error }, 400);
       }
       console.error("Error creating game:", error);
       return c.json({ error: "Internal server error" }, 500);
@@ -97,7 +102,7 @@ app.put(
       return c.json({ game });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return c.json({ error: "Validation error", details: error.errors }, 400);
+        return c.json({ error: "Validation error", details: error }, 400);
       }
       console.error("Error updating game:", error);
       return c.json({ error: "Internal server error" }, 500);
@@ -138,10 +143,13 @@ app.get("/categories", userOnly, async (c) => {
 app.post(
   "/admin/categories",
   adminOnly,
-  zValidator("json", z.object({
-    name: z.string().min(1, "Name is required"),
-    description: z.string().optional(),
-  })),
+  zValidator(
+    "json",
+    z.object({
+      name: z.string().min(1, "Name is required"),
+      description: z.string().optional(),
+    })
+  ),
   async (c) => {
     try {
       const body = c.req.valid("json");
@@ -154,7 +162,7 @@ app.post(
       return c.json({ category }, 201);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return c.json({ error: "Validation error", details: error.errors }, 400);
+        return c.json({ error: "Validation error", details: error }, 400);
       }
       console.error("Error creating category:", error);
       return c.json({ error: "Internal server error" }, 500);
