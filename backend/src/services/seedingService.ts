@@ -33,8 +33,8 @@ const VipLevelSchema = z.object({
   level: z.string(),
   name: z.string(),
   minExperience: z.string(),
-  cashbackRate: z.number().min(0).max(100),
-  freeSpinsPerMonth: z.number().min(0),
+  cashbackRate: z.string(),
+  freeSpinsPerMonth: z.string(),
   benefits: z.record(z.string(), z.any()).optional(),
 });
 
@@ -44,6 +44,14 @@ const JackpotPoolSchema = z.object({
   seedValue: z.string(),
   contributionRate: z.string(),
 });
+
+// Define proper typing for jackpot pool seeding data
+type JackpotPoolData = {
+  group: string;
+  level: "mini" | "minor" | "major" | "grand";
+  seedValue: string;
+  contributionRate: string;
+};
 
 export class SeedingService {
   /**
@@ -291,7 +299,7 @@ export class SeedingService {
    * Seeds jackpot pools
    */
   private static async seedJackpotPools(): Promise<void> {
-    const poolsData = [
+    const poolsData: JackpotPoolData[] = [
       {
         group: "progressive_main",
         level: "mini",
@@ -320,11 +328,25 @@ export class SeedingService {
 
     for (const poolData of poolsData) {
       JackpotPoolSchema.parse(poolData);
+
+      // Parse values with error handling
+      const currentValueParsed = parseFloat(poolData.seedValue);
+      const seedValueParsed = parseFloat(poolData.seedValue);
+      const contributionRateParsed = parseFloat(poolData.contributionRate);
+
+      // Validate parsed values are finite numbers
+      if (!isFinite(currentValueParsed) || !isFinite(seedValueParsed) || !isFinite(contributionRateParsed)) {
+        throw new Error(`Invalid numeric values in jackpot pool data: ${JSON.stringify(poolData)}`);
+      }
+
       await db
         .insert(jackpotPools)
         .values({
-          ...poolData,
-          currentValue: poolData.seedValue,
+          group: poolData.group,
+          level: poolData.level,
+          currentValue: currentValueParsed,
+          seedValue: seedValueParsed,
+          contributionRate: contributionRateParsed,
         })
         .onConflictDoNothing();
     }

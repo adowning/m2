@@ -1,4 +1,4 @@
-import { WebSocket, WSContext } from "hono/ws";
+import { WSContext } from "hono/ws";
 import { z } from "zod";
 
 // Message schemas
@@ -26,7 +26,12 @@ interface Connection {
 export class WebSocketService {
   private static connections: Map<string, Connection> = new Map();
 
-  static addConnection(id: string, ws: WebSocket, userId?: string, operatorId?: string) {
+  static addConnection(
+    id: string,
+    ws: WebSocket,
+    userId?: string,
+    operatorId?: string
+  ) {
     this.connections.set(id, { ws, userId, operatorId });
   }
 

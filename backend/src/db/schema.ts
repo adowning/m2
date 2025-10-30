@@ -8,7 +8,10 @@ import {
   pgEnum,
   jsonb,
   index,
+  integer,
+  real,
 } from "drizzle-orm/pg-core";
+
 import { relations } from "drizzle-orm";
 import {
   createInsertSchema,
@@ -18,6 +21,103 @@ import {
 import type z from "zod";
 
 // Enums
+
+export const bonusStatusEnum = pgEnum("bonus_status_enum", [
+  "PENDING",
+  "ACTIVE",
+  "COMPLETED",
+  "EXPIRED",
+  "CANCELLED",
+]);
+export const affiliateStatusEnum = pgEnum("affliate_status_enum", [
+  "PAID",
+  "NEEDS_REVIEWED",
+  "PASSED_REVIEW",
+  "FAILED_REVIEW",
+]);
+export const bonusTypeEnum = pgEnum("bonus_type_enum", [
+  "DEPOSIT_MATCH",
+  "FREE_SPINS",
+  "CASHBACK",
+  "LEVEL_UP",
+  "MANUAL",
+]);
+export const gameCategoriesEnum = pgEnum("game_categories_enum", [
+  "SLOTS",
+  "FISH",
+  "TABLE",
+  "LIVE",
+  "OTHER",
+]);
+export const gameStatusEnum = pgEnum("game_status_enum", [
+  "ACTIVE",
+  "INACTIVE",
+  "MAINTENANCE",
+]);
+export const jackpotGroupEnum = pgEnum("jackpot_group_enum", [
+  "minor",
+  "major",
+  "mega",
+]);
+export const userRoleEnum = pgEnum("user_role_enum", [
+  "USER",
+  "AFFILIATE",
+  "ADMIN",
+  "OPERATOR",
+]);
+
+export const sessionStatusEnum = pgEnum("session_status_enum", [
+  "ACTIVE",
+  "COMPLETED",
+  "EXPIRED",
+  "ABANDONED",
+  "TIMEOUT",
+  "OTP_PENDING",
+]);
+export const transactionStatusEnum = pgEnum("transaction_status_enum", [
+  "PENDING",
+  "PROCESSING",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+  "REJECTED",
+  "EXPIRED",
+]);
+export const transactionTypeEnum = pgEnum("transaction_type_enum", [
+  "DEPOSIT",
+  "WITHDRAWAL",
+  "BET",
+  "WIN",
+  "BONUS_AWARD",
+  "BONUS_WAGER",
+  "BONUS_CONVERT",
+  "ADJUSTMENT",
+  "CASHBACK",
+  "AFFILIATE_PAYOUT",
+  "BONUS",
+]);
+export const jackpotTypeEnum = pgEnum("type_of_jackpot_enum", [
+  "MINOR",
+  "MAJOR",
+  "GRAND",
+]);
+export const userStatusEnum = pgEnum("user_status_enum", [
+  "ACTIVE",
+  "INACTIVE",
+  "BANNED",
+  "PENDING",
+]);
+
+export const equalityOperatorEnum = pgEnum("equality_op", [
+  "eq",
+  "neq",
+  "lt",
+  "lte",
+  "gt",
+  "gte",
+  "in",
+]);
+
 export const transactionStatus = pgEnum("transaction_status", [
   "pending",
   "completed",
@@ -31,6 +131,42 @@ export const jackpotLevel = pgEnum("jackpot_level", [
   "major",
   "grand",
 ]);
+import { sql } from "drizzle-orm";
+import { customType } from "drizzle-orm/pg-core";
+
+const customTimestamp = customType<{
+  data: Date; // The type in your application code
+  driverData: string; // The type in the database driver
+  config: { precision: number | undefined };
+  zodType: z.ZodDate; // Updated from 'zod' to 'zodType' for drizzle-zod
+}>({
+  dataType() {
+    const precision = 3;
+    return precision
+      ? `timestamp(${precision}) with time zone`
+      : "timestamp with time zone";
+  },
+
+  toDriver(value: Date): string {
+    return value.toISOString();
+  },
+
+  fromDriver(value: string): Date {
+    return new Date(value);
+  },
+});
+
+export const timestampColumns = {
+  createdAt: customTimestamp("created_at", { precision: 3 })
+    .default(sql`now()`)
+    .notNull(),
+  updatedAt: customTimestamp("updated_at", { precision: 3 }),
+};
+
+// You'll also need to decide on a standard for nullable/mode-specific timestamps
+export const expiresAtTimestamp = customTimestamp("expires_at", {
+  precision: 3,
+});
 
 // Operators table (central casino brands)
 export const operators = pgTable(
@@ -150,32 +286,23 @@ export const wallets = pgTable(
 );
 
 // Transactions table (deposits/withdrawals, with status)
-export const transactions = pgTable(
-  "transactions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .references(() => users.id, { onDelete: "cascade" })
-      .notNull(),
-    operatorId: uuid("operator_id")
-      .references(() => operators.id, { onDelete: "cascade" })
-      .notNull(),
-    type: pgEnum("type", ["deposit", "withdrawal"]), // 'deposit' or 'withdrawal'
-    amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
-    status: transactionStatus("status").default("pending").notNull(),
-    paymentMethod: text("payment_method"), // e.g., 'cashapp', 'in_store_cash'
-    externalId: text("external_id"), // for webhook matching
-    notes: text("notes"), // rejection reason, etc.
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (t) => [
-    index("transactions_user_id_index").on(t.userId),
-    index("transactions_operator_id_index").on(t.operatorId),
-    index("transactions_status_index").on(t.status),
-    index("transactions_external_id_index").on(t.externalId),
-  ]
-);
+export const transactions = pgTable("transactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  operatorId: uuid("operator_id")
+    .references(() => operators.id, { onDelete: "cascade" })
+    .notNull(),
+  type: pgEnum("type", ["deposit", "withdrawal"]), // 'deposit' or 'withdrawal'
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  status: transactionStatus("status").default("pending").notNull(),
+  paymentMethod: text("payment_method"), // e.g., 'cashapp', 'in_store_cash'
+  externalId: text("external_id"), // for webhook matching
+  notes: text("notes"), // rejection reason, etc.
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 // Bet logs table (comprehensive betting history)
 export const betLogs = pgTable(
@@ -356,69 +483,196 @@ export const jackpots = pgTable(
     createdAtIdx: index("jackpots_created_at_idx").on(table.createdAt),
   })
 );
-
-// Relations
-export const operatorsRelations = relations(operators, ({ many }) => ({
-  wallets: many(wallets),
-  transactions: many(transactions),
-  betLogs: many(betLogs),
-  bonusTasks: many(bonusTasks),
-  jackpots: many(jackpots),
-}));
-
-export const usersRelations = relations(users, ({ many }) => ({
-  sessions: many(sessions),
-  wallets: many(wallets),
-  transactions: many(transactions),
-  betLogs: many(betLogs),
-  bonusTasks: many(bonusTasks),
-  jackpots: many(jackpots),
-}));
-
-export const sessionsRelations = relations(sessions, ({ one }) => ({
-  user: one(users, {
-    fields: [sessions.userId],
-    references: [users.id],
-  }),
-}));
-
-export const gameCategoriesRelations = relations(
-  gameCategories,
-  ({ many }) => ({
-    games: many(games),
-  })
+export const transactionLogTable = pgTable(
+  "transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey().notNull(),
+    createdAt: timestampColumns.createdAt,
+    updatedAt: timestampColumns.updatedAt,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    relatedId: uuid("related_id"),
+    sessionId: uuid("session_id"),
+    tnxId: uuid("tnx_id"),
+    type: transactionTypeEnum("type").notNull(),
+    typeDescription: text("type_description"),
+    status: transactionStatusEnum("status").default("COMPLETED").notNull(),
+    wagerAmount: integer("wager_amount"),
+    realBalanceBefore: integer("real_balance_before").notNull(),
+    realBalanceAfter: integer("real_balance_after").notNull(),
+    bonusBalanceBefore: integer("bonus_balance_before").notNull(),
+    bonusBalanceAfter: integer("bonus_balance_after").notNull(),
+    gameId: uuid("game_id").references(() => games.id),
+    gameName: text("game_name"),
+    provider: text("provider"),
+    category: text("category"),
+    operatorId: uuid("operator_id").references(() => operators.id),
+    ggrContribution: integer("ggr_contribution"),
+    jackpotContribution: integer("jackpot_contribution"),
+    vipPointsAdded: integer("vip_points_added"),
+    processingTime: integer("processing_time"),
+    metadata: jsonb("metadata"),
+    affiliateId: uuid("affiliate_id"),
+    path: text("path").array(),
+    updatedBy: text("updated_by").default("system").notNull(),
+    version: integer("version").default(1).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+  },
+  (t) => [
+    index("transaction_log_user_id_index").on(t.userId),
+    index("transaction_log_type_index").on(t.type),
+    index("transaction_log_status_index").on(t.status),
+    index("transaction_log_game_id_index").on(t.gameId),
+  ]
 );
 
-export const gamesRelations = relations(games, ({ one, many }) => ({
-  category: one(gameCategories, {
-    fields: [games.categoryId],
-    references: [gameCategories.id],
-  }),
-  betLogs: many(betLogs),
-  jackpots: many(jackpots),
-}));
+export const TransactionLogSelectSchema =
+  createSelectSchema(transactionLogTable);
+export const TransactionLogInsertSchema =
+  createInsertSchema(transactionLogTable);
+export const TransactionLogUpdateSchema =
+  createUpdateSchema(transactionLogTable);
+export type TransactionLog = z.infer<typeof TransactionLogSelectSchema>;
 
-export const walletsRelations = relations(wallets, ({ one }) => ({
-  user: one(users, {
-    fields: [wallets.userId],
-    references: [users.id],
-  }),
-  operator: one(operators, {
-    fields: [wallets.operatorId],
-    references: [operators.id],
-  }),
-}));
+export const depositTable = pgTable(
+  "deposits",
+  {
+    id: uuid("id").primaryKey().notNull(),
+    createdAt: timestampColumns.createdAt,
+    updatedAt: timestampColumns.updatedAt,
+    version: integer("version").default(1).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    operatorId: uuid("operator_id")
+      .notNull()
+      .references(() => operators.id),
+    transactionId: uuid("transaction_id").references(
+      () => transactionLogTable.id
+    ),
+    amount: integer("amount").notNull(),
+    status: transactionStatusEnum("status").default("PENDING").notNull(),
+    paymentMethod: text("payment_method"),
+    referenceId: uuid("reference_id"),
+    note: text("note"),
+    metadata: jsonb("metadata"),
+    bonusAmount: integer("bonus_amount").notNull(),
+  },
 
-export const transactionsRelations = relations(transactions, ({ one }) => ({
-  user: one(users, {
-    fields: [transactions.userId],
-    references: [users.id],
-  }),
-  operator: one(operators, {
-    fields: [transactions.operatorId],
-    references: [operators.id],
-  }),
-}));
+  (t) => [
+    index("deposit_user_id_index").on(t.userId),
+    index("deposit_referenceId_index").on(t.referenceId),
+    index("deposit_status_index").on(t.status),
+    index("deposit_transactionId_id_index").on(t.transactionId),
+  ]
+);
+
+export const DepositSelectSchema = createSelectSchema(depositTable);
+export const DepositInsertSchema = createInsertSchema(depositTable);
+export const DepositUpdateSchema = createUpdateSchema(depositTable);
+export type Deposit = z.infer<typeof DepositSelectSchema>;
+
+export const withdrawalTable = pgTable(
+  "withdrawals",
+  {
+    id: uuid("id").defaultRandom().primaryKey().notNull(),
+    createdAt: timestampColumns.createdAt,
+    updatedAt: timestampColumns.updatedAt,
+    updatedBy: text("updated_by").default("system").notNull(),
+    version: integer("version").default(1).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    operatorId: uuid("operator_id")
+      .notNull()
+      .references(() => operators.id),
+    transactionId: uuid("transaction_id").references(
+      () => transactionLogTable.id
+    ),
+    amount: integer("amount").notNull(),
+    status: transactionStatusEnum("status").default("PENDING").notNull(),
+    payoutMethod: text("payout_method"),
+    note: text("note"),
+    metadata: jsonb("metadata"),
+  },
+
+  (t) => [
+    index("withdrawal_user_id_index").on(t.userId),
+    index("withdrawal_status_index").on(t.status),
+    index("withdrawal_transactionId_id_index").on(t.transactionId),
+  ]
+);
+
+export const WithdrawalSelectSchema = createSelectSchema(withdrawalTable);
+export const WithdrawalInsertSchema = createInsertSchema(withdrawalTable);
+export const WithdrawalUpdateSchema = createUpdateSchema(withdrawalTable);
+export type Withdrawal = z.infer<typeof WithdrawalSelectSchema>;
+
+export const affiliatePayoutTable = pgTable("affiliate_payouts", {
+  id: uuid("id").primaryKey().notNull(),
+  createdAt: timestampColumns.createdAt,
+  updatedAt: timestampColumns.updatedAt,
+  updatedBy: text("updated_by").default("system").notNull(),
+  version: integer("version").default(1).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  affiliateId: uuid("affiliate_id")
+    .notNull()
+    .references(() => users.id),
+  weekStart: customTimestamp("week_start", {
+    precision: 3,
+  }).notNull(),
+  weekEnd: customTimestamp("week_end", {
+    precision: 3,
+  }).notNull(),
+  totalGgr: integer("total_ggr").notNull(),
+  commissionRate: real("commission_rate").notNull(),
+  commissionAmount: integer("commission_amount").notNull(),
+  status: affiliateStatusEnum("status").default("NEEDS_REVIEWED"),
+  transactionId: uuid("transaction_id"),
+  paidAt: customTimestamp("paid_at", { precision: 3 }),
+});
+
+// export const affiliatePayoutsWeekIdx = index("affiliate_payouts_week_idx").on(
+//   affiliatePayoutTable.affiliateId,
+//   affiliatePayoutTable.weekStart
+// );
+// export const affiliatePayoutsStatusIdx = index(
+//   "affiliate_payouts_status_idx"
+// ).on(affiliatePayoutTable.status);
+
+export const AffiliatePayoutSelectSchema =
+  createSelectSchema(affiliatePayoutTable);
+export const AffiliatePayoutInsertSchema =
+  createInsertSchema(affiliatePayoutTable);
+export const AffiliatePayoutUpdateSchema =
+  createUpdateSchema(affiliatePayoutTable);
+export type AffiliatePayout = z.infer<typeof AffiliatePayoutSelectSchema>;
+
+export const commissionTable = pgTable("commissions", {
+  id: uuid("id").primaryKey().notNull(),
+  createdAt: timestampColumns.createdAt,
+  updatedAt: timestampColumns.updatedAt,
+  version: integer("version").default(1).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  level: integer("level").notNull(),
+  name: text("name").notNull(),
+  rate: real("rate").notNull(),
+});
+
+// export const commissionsLevelIdx = uniqueIndex("commissions_level_idx").on(
+//   commissionTable.level
+// );
+// export const commissionsLevelUnique = unique("commissions_level_unique").on(
+//   commissionTable.level
+// );
+
+export const CommissionSelectSchema = createSelectSchema(commissionTable);
+export const CommissionInsertSchema = createInsertSchema(commissionTable);
+export const CommissionUpdateSchema = createUpdateSchema(commissionTable);
+export type Commission = z.infer<typeof CommissionSelectSchema>;
 
 export const betLogsRelations = relations(betLogs, ({ one }) => ({
   user: one(users, {

@@ -1,8 +1,10 @@
 import { db } from "../db/db";
-import { transactionLogTable } from "../../database/schema/finance";
-import { betLogs } from "../db/schema";
+import {
+  affiliatePayoutTable,
+  betLogs,
+  transactionLogTable,
+} from "../db/schema";
 import { wallets } from "../db/schema";
-import { affiliatePayoutTable } from "../../database/schema/affiliate";
 import { games } from "../db/schema";
 import { eq, and, gte, lte, sum, count, sql, desc } from "drizzle-orm";
 import { z } from "zod";
