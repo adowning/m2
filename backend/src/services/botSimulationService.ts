@@ -237,7 +237,7 @@ export class BotSimulationService {
       }
 
       // Simulate RNG outcome
-      const outcome = this.simulateGameOutcome(game.rtp);
+      const outcome = this.simulateGameOutcome(parseInt(game.rtp));
       const winAmount = outcome.win
         ? this.calculateWinAmount(betAmount, outcome.multiplier)
         : 0;

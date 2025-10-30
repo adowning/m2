@@ -1,6 +1,6 @@
 import { db } from "../db/db";
 import { games, gameCategories } from "../db/schema";
-import { eq, like, and } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { z } from "zod";
 import type { Game, GameCategory } from "../db/schema";
 
@@ -50,17 +50,17 @@ export class GameService {
         paytable: validatedInput.paytable,
       })
       .returning();
-
+    if (!game) throw new Error("no game");
     return game;
   }
 
   static async getGames(category?: string): Promise<Game[]> {
-    const whereCondition = category
-      ? and(
-          eq(games.categoryId, category) // Note: This assumes category is the ID, but PRD says filter by category name
-          // Actually looking at schema, categoryId is UUID, so we need to join
-        )
-      : undefined;
+    // const whereCondition = category
+    //   ? and(
+    //       eq(games.categoryId, category) // Note: This assumes category is the ID, but PRD says filter by category name
+    //       // Actually looking at schema, categoryId is UUID, so we need to join
+    //     )
+    //   : undefined;
 
     // For now, just get all games - category filtering needs join
     const gameList = await db.select().from(games);

@@ -1,12 +1,10 @@
 import { db } from "../db/db";
 import {
   operators,
-  users,
   gameCategories,
   games,
   vipLevels,
   jackpotPools,
-  wallets,
 } from "../db/schema";
 import { z } from "zod";
 
@@ -22,29 +20,29 @@ const GameCategorySchema = z.object({
 
 const GameSchema = z.object({
   name: z.string(),
-  categoryId: z.string().uuid(),
+  category: z.string(),
   provider: z.string(),
-  rtp: z.number().min(0).max(100),
+  rtp: z.string(),
   jackpotGroup: z.string().optional(),
-  minBet: z.number().min(0),
-  maxBet: z.number().min(0),
-  paytable: z.record(z.any()),
+  minBet: z.string(),
+  maxBet: z.string(),
+  goldsvetData: z.record(z.string(), z.any()),
 });
 
 const VipLevelSchema = z.object({
-  level: z.number().min(1),
+  level: z.string(),
   name: z.string(),
-  minExperience: z.number().min(0),
+  minExperience: z.string(),
   cashbackRate: z.number().min(0).max(100),
   freeSpinsPerMonth: z.number().min(0),
-  benefits: z.record(z.any()).optional(),
+  benefits: z.record(z.string(), z.any()).optional(),
 });
 
 const JackpotPoolSchema = z.object({
   group: z.string(),
   level: z.enum(["mini", "minor", "major", "grand"]),
-  seedValue: z.number().min(0),
-  contributionRate: z.number().min(0).max(100),
+  seedValue: z.string(),
+  contributionRate: z.string(),
 });
 
 export class SeedingService {
@@ -130,24 +128,24 @@ export class SeedingService {
    * Seeds games
    */
   private static async seedGames(): Promise<void> {
-    // Get category IDs
-    const categories = await db.select().from(gameCategories);
-
-    const categoryMap = categories.reduce((acc, cat) => {
-      acc[cat.name] = cat.id;
-      return acc;
-    }, {} as Record<string, string>);
+    const categoryMap: Record<string, string> = {
+      "Slots": "SLOTS",
+      "Table Games": "TABLE",
+      "Live Dealer": "LIVE",
+      "Video Poker": "OTHER",
+      "Other": "OTHER",
+    };
 
     const gamesData = [
       {
         name: "Mega Fortune",
-        categoryId: categoryMap["Slots"],
+        category: categoryMap["Slots"],
         provider: "NetEnt",
-        rtp: 96.6,
+        rtp: "96.6",
         jackpotGroup: "progressive_main",
-        minBet: 1.0,
-        maxBet: 100.0,
-        paytable: {
+        minBet: "1.0",
+        maxBet: "100.0",
+        goldsvetData: {
           "3x": 5,
           "4x": 50,
           "5x": 500,
@@ -156,12 +154,12 @@ export class SeedingService {
       },
       {
         name: "Book of Ra",
-        categoryId: categoryMap["Slots"],
+        category: categoryMap["Slots"],
         provider: "Novomatic",
-        rtp: 96.1,
-        minBet: 0.2,
-        maxBet: 50.0,
-        paytable: {
+        rtp: "96.1",
+        minBet: "0.2",
+        maxBet: "50.0",
+        goldsvetData: {
           "3x": 10,
           "4x": 100,
           "5x": 1000,
@@ -169,12 +167,12 @@ export class SeedingService {
       },
       {
         name: "Blackjack Classic",
-        categoryId: categoryMap["Table Games"],
+        category: categoryMap["Table Games"],
         provider: "Evolution",
-        rtp: 99.5,
-        minBet: 5.0,
-        maxBet: 1000.0,
-        paytable: {
+        rtp: "99.5",
+        minBet: "5.0",
+        maxBet: "1000.0",
+        goldsvetData: {
           blackjack: 1.5,
           win: 1.0,
           push: 0,
@@ -183,12 +181,12 @@ export class SeedingService {
       },
       {
         name: "European Roulette",
-        categoryId: categoryMap["Table Games"],
+        category: categoryMap["Table Games"],
         provider: "Playtech",
-        rtp: 97.3,
-        minBet: 1.0,
-        maxBet: 500.0,
-        paytable: {
+        rtp: "97.3",
+        minBet: "1.0",
+        maxBet: "500.0",
+        goldsvetData: {
           straight: 35,
           split: 17,
           street: 11,
@@ -200,12 +198,12 @@ export class SeedingService {
       },
       {
         name: "Live Baccarat",
-        categoryId: categoryMap["Live Dealer"],
+        category: categoryMap["Live Dealer"],
         provider: "Evolution",
-        rtp: 98.9,
-        minBet: 10.0,
-        maxBet: 2000.0,
-        paytable: {
+        rtp: "98.9",
+        minBet: "10.0",
+        maxBet: "2000.0",
+        goldsvetData: {
           banker: 0.95,
           player: 1.0,
           tie: 8.0,
@@ -227,49 +225,62 @@ export class SeedingService {
   private static async seedVipLevels(): Promise<void> {
     const vipLevelsData = [
       {
-        level: 1,
+        level: "1",
         name: "Bronze",
-        minExperience: 0,
-        cashbackRate: 0,
-        freeSpinsPerMonth: 0,
+        minExperience: "0",
+        cashbackRate: "0.00",
+        freeSpinsPerMonth: "0",
         benefits: { multiplier: 1.0 },
       },
       {
-        level: 2,
+        level: "2",
         name: "Silver",
-        minExperience: 1000,
-        cashbackRate: 2.5,
-        freeSpinsPerMonth: 10,
+        minExperience: "1000",
+        cashbackRate: "2.50",
+        freeSpinsPerMonth: "10",
         benefits: { multiplier: 1.1 },
       },
       {
-        level: 3,
+        level: "3",
         name: "Gold",
-        minExperience: 5000,
-        cashbackRate: 5.0,
-        freeSpinsPerMonth: 25,
+        minExperience: "5000",
+        cashbackRate: "5.00",
+        freeSpinsPerMonth: "25",
         benefits: { multiplier: 1.25 },
       },
       {
-        level: 4,
+        level: "4",
         name: "Platinum",
-        minExperience: 25000,
-        cashbackRate: 7.5,
-        freeSpinsPerMonth: 50,
+        minExperience: "25000",
+        cashbackRate: "7.50",
+        freeSpinsPerMonth: "50",
         benefits: { multiplier: 1.5 },
       },
       {
-        level: 5,
+        level: "5",
         name: "Diamond",
-        minExperience: 100000,
-        cashbackRate: 10.0,
-        freeSpinsPerMonth: 100,
+        minExperience: "100000",
+        cashbackRate: "10.00",
+        freeSpinsPerMonth: "100",
         benefits: { multiplier: 2.0 },
       },
     ];
 
+    console.log("VIP Levels data types before insert:");
+    for (const vipData of vipLevelsData) {
+      console.log(`VIP Level ${vipData.level}:`, {
+        level: typeof vipData.level,
+        name: typeof vipData.name,
+        minExperience: typeof vipData.minExperience,
+        cashbackRate: typeof vipData.cashbackRate,
+        freeSpinsPerMonth: typeof vipData.freeSpinsPerMonth,
+        benefits: typeof vipData.benefits,
+      });
+    }
+
     for (const vipData of vipLevelsData) {
       VipLevelSchema.parse(vipData);
+      console.log(`Attempting to insert VIP Level ${vipData.level} with cashbackRate: ${vipData.cashbackRate} (type: ${typeof vipData.cashbackRate})`);
       await db.insert(vipLevels).values(vipData).onConflictDoNothing();
     }
 
@@ -284,26 +295,26 @@ export class SeedingService {
       {
         group: "progressive_main",
         level: "mini",
-        seedValue: 10000,
-        contributionRate: 2.0,
+        seedValue: "10000",
+        contributionRate: "2.0",
       },
       {
         group: "progressive_main",
         level: "minor",
-        seedValue: 50000,
-        contributionRate: 1.0,
+        seedValue: "50000",
+        contributionRate: "1.0",
       },
       {
         group: "progressive_main",
         level: "major",
-        seedValue: 250000,
-        contributionRate: 0.5,
+        seedValue: "250000",
+        contributionRate: "0.5",
       },
       {
         group: "progressive_main",
         level: "grand",
-        seedValue: 1000000,
-        contributionRate: 0.1,
+        seedValue: "1000000",
+        contributionRate: "0.1",
       },
     ];
 

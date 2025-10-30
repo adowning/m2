@@ -1,8 +1,8 @@
 import { db } from "../db/db";
-import { wallets, bonusTasks, vipLevels, users } from "../db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { WalletService } from "./walletService";
+import { users, vipLevels } from "../db/schema";
 
 const ApplyLevelUpRewardsSchema = z.object({
   userId: z.string().uuid(),

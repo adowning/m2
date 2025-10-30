@@ -121,7 +121,7 @@ export class JackpotService {
       await db
         .update(jackpotPools)
         .set({
-          currentValue: pool.seedValue,
+          currentValue: pool.seedValue.toFixed(2),
           updatedAt: new Date(),
         })
         .where(

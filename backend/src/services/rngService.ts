@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 const GenerateOutcomeSchema = z.object({
   gameId: z.string().uuid(),
@@ -34,13 +34,16 @@ export class RNGService {
       // Win scenario
       const winRandom = Math.random();
 
-      if (winRandom < 0.01) { // 1% chance of big win
+      if (winRandom < 0.01) {
+        // 1% chance of big win
         multiplier = Math.floor(Math.random() * 50) + 10; // 10x to 60x
         outcome = "big_win";
-      } else if (winRandom < 0.1) { // 9% chance of medium win
+      } else if (winRandom < 0.1) {
+        // 9% chance of medium win
         multiplier = Math.floor(Math.random() * 5) + 2; // 2x to 7x
         outcome = "medium_win";
-      } else { // 90% chance of small win
+      } else {
+        // 90% chance of small win
         multiplier = Math.random() * 2; // 0x to 2x
         outcome = "small_win";
       }
@@ -85,11 +88,17 @@ export class RNGService {
    * Returns an array of symbols representing the outcome
    */
   static simulateSlotReels(symbols: string[], reelCount: number = 3): string[] {
+    if (symbols.length === 0) {
+      throw new Error("Symbols array must not be empty");
+    }
+
     const outcome: string[] = [];
 
     for (let i = 0; i < reelCount; i++) {
-      const randomIndex = Math.floor(this.generateSecureRandom() * symbols.length);
-      outcome.push(symbols[randomIndex]);
+      const randomIndex = Math.floor(
+        this.generateSecureRandom() * symbols.length
+      );
+      outcome.push(symbols[randomIndex]!);
     }
 
     return outcome;
@@ -103,7 +112,7 @@ export class RNGService {
     outcome: string[],
     paytable: Record<string, number>
   ): number {
-    const outcomeKey = outcome.join('-');
+    const outcomeKey = outcome.join("-");
     return paytable[outcomeKey] || 0;
   }
 }

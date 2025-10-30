@@ -10,6 +10,12 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import {
+  createInsertSchema,
+  createSelectSchema,
+  createUpdateSchema,
+} from "drizzle-zod";
+import type z from "zod";
 
 // Enums
 export const transactionStatus = pgEnum("transaction_status", [
@@ -154,7 +160,7 @@ export const transactions = pgTable(
     operatorId: uuid("operator_id")
       .references(() => operators.id, { onDelete: "cascade" })
       .notNull(),
-    type: text("type").notNull(), // 'deposit' or 'withdrawal'
+    type: pgEnum("type", ["deposit", "withdrawal"]), // 'deposit' or 'withdrawal'
     amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
     status: transactionStatus("status").default("pending").notNull(),
     paymentMethod: text("payment_method"), // e.g., 'cashapp', 'in_store_cash'
@@ -163,12 +169,12 @@ export const transactions = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => ({
-    userIdIdx: index("transactions_user_id_idx").on(table.userId),
-    operatorIdIdx: index("transactions_operator_id_idx").on(table.operatorId),
-    statusIdx: index("transactions_status_idx").on(table.status),
-    externalIdIdx: index("transactions_external_id_idx").on(table.externalId),
-  })
+  (t) => [
+    index("transactions_user_id_index").on(t.userId),
+    index("transactions_operator_id_index").on(t.operatorId),
+    index("transactions_status_index").on(t.status),
+    index("transactions_external_id_index").on(t.externalId),
+  ]
 );
 
 // Bet logs table (comprehensive betting history)
@@ -464,3 +470,18 @@ export const jackpotsRelations = relations(jackpots, ({ one }) => ({
     references: [games.id],
   }),
 }));
+
+export const GameSelectSchema = createSelectSchema(games);
+export const GameInsertSchema = createInsertSchema(games);
+export const GameUpdateSchema = createUpdateSchema(games);
+export type Game = z.infer<typeof GameSelectSchema>;
+
+export const GameCategorySelectSchema = createSelectSchema(gameCategories);
+export const GameCategoryInsertSchema = createInsertSchema(gameCategories);
+export const GameCategoryUpdateSchema = createUpdateSchema(gameCategories);
+export type GameCategory = z.infer<typeof GameCategorySelectSchema>;
+
+export const OperatorSelectSchema = createSelectSchema(operators);
+export const OperatorInsertSchema = createInsertSchema(operators);
+export const OperatorUpdateSchema = createUpdateSchema(operators);
+export type Operator = z.infer<typeof OperatorSelectSchema>;
