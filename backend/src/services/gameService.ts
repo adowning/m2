@@ -12,7 +12,7 @@ const CreateGameInputSchema = z.object({
   jackpotGroup: z.string().nullable(),
   minBet: z.number().min(0),
   maxBet: z.number().min(0),
-  paytable: z.unknown(),
+  paytable: z.array(z.record(z.number())),
 });
 
 const UpdateGameInputSchema = CreateGameInputSchema.partial();
@@ -125,9 +125,11 @@ export class GameService {
   }
 
   static async deleteGame(id: string): Promise<boolean> {
-    // Soft delete by setting isActive to false - but schema doesn't have isActive, so hard delete
-    const result = await db.delete(games).where(eq(games.id, id));
-    return result.rowCount > 0;
+    const deletedGames = await db
+      .delete(games)
+      .where(eq(games.id, id))
+      .returning({ id: games.id });
+    return deletedGames.length > 0;
   }
 
   static async getGameCategories(): Promise<GameCategory[]> {
@@ -146,7 +148,7 @@ export class GameService {
         description: validatedInput.description,
       })
       .returning();
-
+    if (!category) throw new Error("Failed to create game category");
     return category;
   }
 
@@ -175,9 +177,10 @@ export class GameService {
   }
 
   static async deleteGameCategory(id: string): Promise<boolean> {
-    const result = await db
+    const deletedCategories = await db
       .delete(gameCategories)
-      .where(eq(gameCategories.id, id));
-    return result.rowCount > 0;
+      .where(eq(gameCategories.id, id))
+      .returning({ id: gameCategories.id });
+    return deletedCategories.length > 0;
   }
 }
